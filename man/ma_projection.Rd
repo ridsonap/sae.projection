@@ -14,11 +14,13 @@ ma_projection(
   working_model,
   data_model,
   data_proj,
-  model_metric,
+  model_metric = NULL,
   cv_folds = 3,
   tuning_grid = 10,
   parallel_over = "resamples",
+  cores = NULL,
   seed = 1,
+  bias_correction = FALSE,
   return_yhat = FALSE,
   ...
 )
@@ -28,19 +30,19 @@ ma_projection(
 
 \item{cluster_ids}{Column name (character) or formula specifying cluster identifiers from highest to lowest level. Use \code{~0} or \code{~1} if there are no clusters.}
 
-\item{weight}{Column name in \code{data_proj} representing the survey weights.}
+\item{weight}{Column name in \code{data_proj} (and \code{data_model}) representing the survey weights.}
 
 \item{strata}{Column name for stratification; use \code{NULL} if no strata are used.}
 
-\item{domain}{Character vector specifying domain variable names in both datasets.}
+\item{domain}{Character vector or formula specifying domain variable names. Must be present in \code{data_proj}.}
 
 \item{summary_function}{A function to compute domain-level estimates (default: \code{"mean"}, \code{"total"}, \code{"variance"}).}
 
 \item{working_model}{A parsnip model object specifying the working model (see \verb{@details}).}
 
-\item{data_model}{Data frame (small sample) containing both target and auxiliary variables.}
+\item{data_model}{Data frame (small sample, Survey 2) containing both target and auxiliary variables.}
 
-\item{data_proj}{Data frame (large sample) containing only auxiliary variables.}
+\item{data_proj}{Data frame (large sample, Survey 1) containing auxiliary variables and domain variables.}
 
 \item{model_metric}{A \code{yardstick::metric_set()} function, or \code{NULL} to use default metrics.}
 
@@ -48,29 +50,32 @@ ma_projection(
 
 \item{tuning_grid}{Either a data frame with tuning parameters or a positive integer specifying the number of grid search candidates.}
 
-\item{parallel_over}{Specifies parallelization mode: \code{"resamples"}, \code{"everything"}, or \code{NULL}.
-If "resamples", then tuning will be performed in parallel over resamples alone. Within each resample, the preprocessor (i.e. recipe or formula) is processed once, and is then reused across all models that need to be fit.
-If "everything", then tuning will be performed in parallel at two levels. An outer parallel loop will iterate over resamples. Additionally, an inner parallel loop will iterate over all unique combinations of preprocessor and model tuning parameters for that specific resample. This will result in the preprocessor being re-processed multiple times, but can be faster if that processing is extremely fast.}
+\item{parallel_over}{Specifies parallelization mode: \code{"resamples"}, \code{"everything"}, or \code{NULL}.}
+
+\item{cores}{Integer specifying number of cores for parallel execution. If \code{NULL}, defaults to at most 2 cores.}
 
 \item{seed}{Integer seed for reproducibility.}
 
-\item{return_yhat}{Logical; if \code{TRUE}, returns predicted \code{y} values for \code{data_model}.}
+\item{bias_correction}{Logical; if \code{TRUE}, applies domain-level bias correction from Survey 2 where available. If \code{FALSE} (default), uses the pure model-assisted projection estimator as formulated in Kim & Rao (2012).}
+
+\item{return_yhat}{Logical; if \code{TRUE}, returns survey estimates of the target variable from \code{data_model}.}
 
 \item{...}{Additional arguments passed to \code{\link[survey]{svydesign}}.}
 }
 \value{
 A list containing:
+\item{working_model}{The extracted fit engine from the final workflow.}
+\item{model}{Alias for \code{working_model}.}
+\item{prediction}{A vector of predicted values or probabilities on \code{data_proj}.}
+\item{projection}{A data frame with domain-level estimates.}
 \itemize{
-\item \code{model} – The fitted working model object.
-\item \code{prediction} – A vector of predictions from the working model.
-\item \code{df_result} – A data frame with:
-\itemize{
-\item \code{domain} – Domain identifier.
+\item \code{domain} – Domain identifier(s).
 \item \code{ypr} – Projection estimator results for each domain.
 \item \code{var_ypr} – Estimated variance of the projection estimator.
 \item \code{rse_ypr} – Relative standard error (in \\%).
 }
-}
+\item{df_result}{Alias for \code{projection}.}
+\item{return_yhat}{(Optional) Survey estimates of the target variable from \code{data_model}, present when \code{return_yhat = TRUE}.}
 }
 \description{
 The function addresses the problem of combining information from two or more independent surveys, a common challenge in survey sampling. It focuses on cases where: \cr
@@ -78,7 +83,7 @@ The function addresses the problem of combining information from two or more ind
 \item \strong{Survey 1:} A large sample collects only auxiliary information.
 \item \strong{Survey 2:} A much smaller sample collects both the variables of interest and the auxiliary variables.
 }
-The function implements a model-assisted projection estimation method based on a working model. The working models that can be used include several machine learning models that can be seen in the details section
+The function implements a model-assisted projection estimation method based on a working model. The working models that can be used include several machine learning models that can be seen in the details section.
 }
 \details{
 The following working models are supported via the \pkg{parsnip} interface:
@@ -124,30 +129,21 @@ lm_proj <- ma_projection(
   nest = TRUE
 )
 
+df_svy22_neet <- df_svy22 \%>\%
+     filter(between(age, 15, 24))
+df_svy23_neet <- df_svy23 \%>\%
+     filter(between(age, 15, 24))
 
-df_svy22_neet <- df_svy22 \%>\% filter(between(age, 15, 24))
-df_svy23_neet <- df_svy23 \%>\% filter(between(age, 15, 24))
-
-
-# LightGBM regression with hyperparameter tunning
-show_engines("boost_tree")
-lgbm_model <- boost_tree(
-  mtry = tune(), trees = tune(), min_n = tune(),
-  tree_depth = tune(), learn_rate = tune(),
-  engine = "lightgbm"
-)
-
-lgbm_proj <- ma_projection(
+# Logistic regression
+lr_proj <- ma_projection(
   formula = neet ~ sex + edu + disability,
   cluster_ids = "PSU",
   weight = "WEIGHT",
   strata = "STRATA",
   domain = c("PROV", "REGENCY"),
-  working_model = lgbm_model,
+  working_model = logistic_reg(),
   data_model = df_svy22_neet,
   data_proj = df_svy23_neet,
-  cv_folds = 3,
-  tuning_grid = 3,
   nest = TRUE
 )
 }

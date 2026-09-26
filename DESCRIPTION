@@ -1,7 +1,7 @@
 Package: sae.projection
 Type: Package
 Title: Small Area Estimation Using Model-Assisted Projection Method
-Version: 0.1.4
+Version: 0.1.5
 Authors@R: c(
       person("Ridson", "Al Farizal P", role = c("aut", "cre","cph"), email = "ridsonalfarizal15@gmail.com", comment = c(ORCID = "0000-0003-0617-0214")),
       person("Azka", "Ubaidillah", role = "aut", email = "azka@stis.ac.id", comment = c(ORCID = "0000-0002-3597-0459")),
@@ -14,11 +14,10 @@ Encoding: UTF-8
 LazyData: true
 URL: https://github.com/Alfrzlp/sae.projection
 BugReports: https://github.com/Alfrzlp/sae.projection/issues
-Imports: FSelector, glmnet, xgboost, survey, cli, doParallel, dplyr,
+Imports: survey, cli, doParallel, dplyr,
         methods, parsnip, recipes, rlang, rsample, stats, tune,
         workflows, yardstick, bonsai, ranger, randomForest, themis,
         lightgbm, caret
-RoxygenNote: 7.3.2
 Depends: R (>= 4.3.0), tidymodels
 NeedsCompilation: no
 Repository: CRAN
@@ -30,3 +29,5 @@ Suggests:
     quarto,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
+Language: en-US
+Config/roxygen2/version: 8.0.0
